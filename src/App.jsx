@@ -21,7 +21,7 @@ const products = productsFromServer.map(product => {
   };
 });
 
-const getFilteredProducts = (currentpPoducts, userId) => {
+const getFilteredProducts = (currentpPoducts, userId, query) => {
   let filteredProducts = [...currentpPoducts];
 
   if (userId !== null) {
@@ -30,13 +30,26 @@ const getFilteredProducts = (currentpPoducts, userId) => {
     );
   }
 
+  if (query !== '') {
+    const normalizeQuery = query.trim().toLowerCase();
+
+    filteredProducts = filteredProducts.filter(product => {
+      return product.name.toLowerCase().includes(normalizeQuery);
+    });
+  }
+
   return filteredProducts;
 };
 
 export const App = () => {
   const [activeUserId, setActiveUserId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const visibleProducts = getFilteredProducts(products, activeUserId);
+  const visibleProducts = getFilteredProducts(
+    products,
+    activeUserId,
+    searchQuery,
+  );
 
   return (
     <div className="section">
@@ -79,21 +92,27 @@ export const App = () => {
                   type="text"
                   className="input"
                   placeholder="Search"
-                  value="qwe"
+                  value={searchQuery}
+                  onChange={event => {
+                    setSearchQuery(event.target.value);
+                  }}
                 />
 
                 <span className="icon is-left">
                   <i className="fas fa-search" aria-hidden="true" />
                 </span>
 
-                <span className="icon is-right">
-                  {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
-                  <button
-                    data-cy="ClearButton"
-                    type="button"
-                    className="delete"
-                  />
-                </span>
+                {searchQuery && (
+                  <span className="icon is-right">
+                    {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
+                    <button
+                      data-cy="ClearButton"
+                      type="button"
+                      className="delete"
+                      onClick={() => setSearchQuery('')}
+                    />
+                  </span>
+                )}
               </p>
             </div>
 
