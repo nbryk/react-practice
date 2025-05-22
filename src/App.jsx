@@ -21,7 +21,14 @@ const products = productsFromServer.map(product => {
   };
 });
 
-function getFilteredProducts(currentProducts, userId, query) {
+function getFilteredProducts(
+  currentProducts,
+  userId,
+  query,
+  selectedCategory,
+  sortBy,
+  sortOrder,
+) {
   let filteredProducts = [...currentProducts];
 
   if (userId !== null) {
@@ -38,6 +45,65 @@ function getFilteredProducts(currentProducts, userId, query) {
     });
   }
 
+  if (selectedCategory.length > 0) {
+    filteredProducts = filteredProducts.filter(product => {
+      return selectedCategory.includes(product.category.id);
+    });
+  }
+
+  if (sortBy && sortOrder) {
+    switch (sortBy) {
+      case 'id':
+        filteredProducts.sort((a, b) => a.id - b.id);
+
+        if (sortOrder === 'desc') {
+          filteredProducts.reverse();
+        }
+
+        break;
+
+      case 'product':
+        filteredProducts.sort((a, b) => a.name.localeCompare(b.name));
+
+        if (sortOrder === 'desc') {
+          filteredProducts.reverse();
+        }
+
+        break;
+
+      case 'category':
+        filteredProducts.sort((a, b) => {
+          return a.category.title.localeCompare(b.category.title);
+        });
+
+        if (sortOrder === 'desc') {
+          filteredProducts.reverse();
+        }
+
+        break;
+
+      case 'user':
+        filteredProducts.sort((a, b) => {
+          return a.owner.name.localeCompare(b.owner.name);
+        });
+
+        if (sortOrder === 'desc') {
+          filteredProducts.reverse();
+        }
+
+        break;
+
+      default:
+        throw new Error(`unexpected field`);
+    }
+    // filteredProducts.sort((product1, product2) => {
+    //   switch (sortBy) {
+    //     case 'id':
+
+    //   }
+    // });
+  }
+
   return filteredProducts;
 }
 
@@ -45,10 +111,38 @@ export const App = () => {
   const [activeUserId, setActiveUserId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const [selectedCategories, setSelectedCategories] = useState([]);
+
+  const [sortBy, setSortBy] = useState(null); // 'id', 'product', 'category', 'user'
+  const [sortOrder, setSortOrder] = useState(null); // 'asc', 'desc', or null
+
+  const getSelectedCategories = categoryId => {
+    setSelectedCategories(currentCategories => {
+      return currentCategories.includes(categoryId)
+        ? currentCategories.filter(id => id !== categoryId)
+        : [...currentCategories, categoryId];
+    });
+  };
+
+  const handleSort = column => {
+    if (sortBy !== column) {
+      setSortBy(column);
+      setSortOrder('asc');
+    } else if (sortOrder === 'asc') {
+      setSortOrder('desc');
+    } else if (sortOrder === 'desc') {
+      setSortBy(null);
+      setSortOrder(null);
+    }
+  };
+
   const visibleProducts = getFilteredProducts(
     products,
     activeUserId,
     searchQuery,
+    selectedCategories,
+    sortBy,
+    sortOrder,
   );
 
   return (
@@ -118,33 +212,23 @@ export const App = () => {
               <a
                 href="#/"
                 data-cy="AllCategories"
-                className="button is-success mr-6 is-outlined"
+                className={`button is-success mr-6 ${selectedCategories.length ? 'is-outlined' : ''}`}
+                onClick={() => setSelectedCategories([])}
               >
                 All
               </a>
 
-              <a
-                data-cy="Category"
-                className="button mr-2 my-1 is-info"
-                href="#/"
-              >
-                Category 1
-              </a>
-
-              <a data-cy="Category" className="button mr-2 my-1" href="#/">
-                Category 2
-              </a>
-
-              <a
-                data-cy="Category"
-                className="button mr-2 my-1 is-info"
-                href="#/"
-              >
-                Category 3
-              </a>
-              <a data-cy="Category" className="button mr-2 my-1" href="#/">
-                Category 4
-              </a>
+              {categoriesFromServer.map(cat => (
+                <a
+                  key={cat.id}
+                  data-cy="Category"
+                  className={`button mr-2 my-1 ${selectedCategories.includes(cat.id) ? 'is-info' : ''}`}
+                  href="#/"
+                  onClick={() => getSelectedCategories(cat.id)}
+                >
+                  {cat.title}
+                </a>
+              ))}
             </div>
 
             <div className="panel-block">
@@ -164,89 +248,127 @@ export const App = () => {
         </div>
 
         <div className="box table-container">
-          <p data-cy="NoMatchingMessage">
-            No products matching selected criteria
-          </p>
+          {visibleProducts.length === 0 ? (
+            <p data-cy="NoMatchingMessage">
+              No products matching selected criteria
+            </p>
+          ) : (
+            <table
+              data-cy="ProductTable"
+              className="table is-striped is-narrow is-fullwidth"
+            >
+              <thead>
+                <tr>
+                  <th>
+                    <span className="is-flex is-flex-wrap-nowrap">
+                      ID
+                      <a href="#/" onClick={() => handleSort('id')}>
+                        <span className="icon">
+                          <i
+                            data-cy="SortIcon"
+                            className={classNames('fas', {
+                              'fa-sort': sortBy !== 'id',
+                              'fa-sort-up':
+                                sortBy === 'id' && sortOrder === 'asc',
+                              'fa-sort-down':
+                                sortBy === 'id' && sortOrder === 'desc',
+                            })}
+                          />
+                        </span>
+                      </a>
+                    </span>
+                  </th>
 
-          <table
-            data-cy="ProductTable"
-            className="table is-striped is-narrow is-fullwidth"
-          >
-            <thead>
-              <tr>
-                <th>
-                  <span className="is-flex is-flex-wrap-nowrap">
-                    ID
-                    <a href="#/">
-                      <span className="icon">
-                        <i data-cy="SortIcon" className="fas fa-sort" />
-                      </span>
-                    </a>
-                  </span>
-                </th>
+                  <th>
+                    <span className="is-flex is-flex-wrap-nowrap">
+                      Product
+                      <a href="#/" onClick={() => handleSort('product')}>
+                        <span className="icon">
+                          <i
+                            data-cy="SortIcon"
+                            className={classNames('fas', {
+                              'fa-sort': sortBy !== 'product',
+                              'fa-sort-up':
+                                sortBy === 'product' && sortOrder === 'asc',
+                              'fa-sort-down':
+                                sortBy === 'product' && sortOrder === 'desc',
+                            })}
+                          />
+                        </span>
+                      </a>
+                    </span>
+                  </th>
 
-                <th>
-                  <span className="is-flex is-flex-wrap-nowrap">
-                    Product
-                    <a href="#/">
-                      <span className="icon">
-                        <i data-cy="SortIcon" className="fas fa-sort-down" />
-                      </span>
-                    </a>
-                  </span>
-                </th>
+                  <th>
+                    <span className="is-flex is-flex-wrap-nowrap">
+                      Category
+                      <a href="#/" onClick={() => handleSort('category')}>
+                        <span className="icon">
+                          <i
+                            data-cy="SortIcon"
+                            className={classNames('fas', {
+                              'fa-sort': sortBy !== 'category',
+                              'fa-sort-up':
+                                sortBy === 'category' && sortOrder === 'asc',
+                              'fa-sort-down':
+                                sortBy === 'category' && sortOrder === 'desc',
+                            })}
+                          />
+                        </span>
+                      </a>
+                    </span>
+                  </th>
 
-                <th>
-                  <span className="is-flex is-flex-wrap-nowrap">
-                    Category
-                    <a href="#/">
-                      <span className="icon">
-                        <i data-cy="SortIcon" className="fas fa-sort-up" />
-                      </span>
-                    </a>
-                  </span>
-                </th>
-
-                <th>
-                  <span className="is-flex is-flex-wrap-nowrap">
-                    User
-                    <a href="#/">
-                      <span className="icon">
-                        <i data-cy="SortIcon" className="fas fa-sort" />
-                      </span>
-                    </a>
-                  </span>
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {visibleProducts.map(product => (
-                <tr data-cy="Product" key={product.id}>
-                  <td className="has-text-weight-bold" data-cy="ProductId">
-                    {product.id}
-                  </td>
-
-                  <td data-cy="ProductName">{product.name}</td>
-
-                  <td data-cy="ProductCategory">
-                    {product.category.icon} - {product.category.title}
-                  </td>
-
-                  <td
-                    data-cy="ProductUser"
-                    className={classNames(
-                      product.owner.sex === 'm'
-                        ? 'has-text-link'
-                        : 'has-text-danger',
-                    )}
-                  >
-                    {product.owner.name}
-                  </td>
+                  <th>
+                    <span className="is-flex is-flex-wrap-nowrap">
+                      User
+                      <a href="#/" onClick={() => handleSort('user')}>
+                        <span className="icon">
+                          <i
+                            data-cy="SortIcon"
+                            className={classNames('fas', {
+                              'fa-sort': sortBy !== 'user',
+                              'fa-sort-up':
+                                sortBy === 'user' && sortOrder === 'asc',
+                              'fa-sort-down':
+                                sortBy === 'user' && sortOrder === 'desc',
+                            })}
+                          />
+                        </span>
+                      </a>
+                    </span>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+
+              <tbody>
+                {visibleProducts.map(product => (
+                  <tr data-cy="Product" key={product.id}>
+                    <td className="has-text-weight-bold" data-cy="ProductId">
+                      {product.id}
+                    </td>
+
+                    <td data-cy="ProductName">{product.name}</td>
+
+                    <td data-cy="ProductCategory">
+                      {product.category.icon} - {product.category.title}
+                    </td>
+
+                    <td
+                      data-cy="ProductUser"
+                      className={classNames(
+                        product.owner.sex === 'm'
+                          ? 'has-text-link'
+                          : 'has-text-danger',
+                      )}
+                    >
+                      {product.owner.name}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
